@@ -1,6 +1,6 @@
 <script>
   import { onDestroy } from 'svelte';
-  import { currentPage, selectedFilter, selectedFrame, photos, customEmoji, customColor } from './store.js';
+  import { currentPage, selectedFilter, selectedFrame, photos, customEmoji, customColor, customText } from './store.js';
   import { createMockPhotoDataUrls, generateStripDataUrl } from './strip-renderer.js';
 
   let video;
@@ -29,7 +29,7 @@
   const previewPlaceholders = createMockPhotoDataUrls(4);
 
   let currentFrameIndex = 0;
-  let inlineMode = 'preview'; // preview | camera | upload
+  let inlineMode = 'preview'; // preview | camera | review
   let countdown = null;
   let shooting = false;
   let count = 0;
@@ -98,15 +98,16 @@
   }
 
   $: if (inlineMode !== 'camera') {
-    const sourcePhotos = inlineMode === 'upload' && uploadThumbs.length > 0
+    const sourcePhotos = inlineMode === 'review' && uploadThumbs.length > 0
       ? uploadThumbs
       : previewPlaceholders;
 
-    // Depend explicitly on $selectedFrame, $selectedFilter, $customEmoji, $customColor so preview updates dynamically
+    // Depend explicitly on stores so preview updates dynamically
     const currentFrame = $selectedFrame;
     const currentFilter = $selectedFilter;
     const currentEmoji = $customEmoji;
     const currentColor = $customColor;
+    const currentText = $customText;
     
     const currentToken = ++previewBuildToken;
 
@@ -116,7 +117,7 @@
       selectedFrame: currentFrame,
       customEmoji: currentEmoji,
       customColor: currentColor,
-      footerLabel: 'PREVIEW'
+      footerLabel: currentText || 'PREVIEW'
     })
       .then((stripUrl) => {
         if (currentToken !== previewBuildToken) return;
@@ -245,7 +246,8 @@
 
   function finishToProcessing() {
     stopCamera();
-    currentPage.set('processing');
+    uploadThumbs = [...$photos];
+    inlineMode = 'review';
   }
 
   function triggerUpload() {
@@ -281,6 +283,7 @@
 
       uploadThumbs = normalized;
       photos.set(normalized);
+      inlineMode = 'review';
     } catch (error) {
       alert('Could not load selected images. Please try different files.');
       uploadThumbs = [];
@@ -288,10 +291,20 @@
     }
   }
 
-  function useUploadedPhotos() {
+  function proceedToProcessing() {
     if (uploadThumbs.length > 0) {
       currentPage.set('processing');
     }
+  }
+
+  function swapPhotos(indexA, indexB) {
+    if (indexA < 0 || indexA >= uploadThumbs.length || indexB < 0 || indexB >= uploadThumbs.length) return;
+    const newThumbs = [...uploadThumbs];
+    const temp = newThumbs[indexA];
+    newThumbs[indexA] = newThumbs[indexB];
+    newThumbs[indexB] = temp;
+    uploadThumbs = newThumbs;
+    photos.set(newThumbs);
   }
 
   function resetInlineArea() {
@@ -310,7 +323,7 @@
 <div class="selection-page">
   <header class="top-row">
     <button class="back-btn" on:click={goBack}>Back To Lobby</button>
-    <p class="mode-pill">Mode: {inlineMode === 'preview' ? 'Compose' : inlineMode === 'camera' ? 'Camera Session' : 'Upload Session'}</p>
+    <p class="mode-pill">Mode: {inlineMode === 'preview' ? 'Compose' : inlineMode === 'camera' ? 'Camera Session' : 'Review Session'}</p>
   </header>
 
   <div class="selection-grid">
@@ -347,6 +360,11 @@
         <button class="filter-btn" class:active={$selectedFilter === 'bw'} on:click={() => setFilter('bw')}>B&amp;W</button>
       </div>
 
+      <div class="bottom-label-input">
+        <label for="bottom-text">Strip Label</label>
+        <input type="text" id="bottom-text" placeholder="Add custom text..." bind:value={$customText} maxlength="30" />
+      </div>
+
       <div class="meta-row">
         <p>4 shots per strip</p>
         <p>Auto-save enabled</p>
@@ -358,12 +376,31 @@
           <button class="action-btn" on:click={triggerUpload}>Upload Images</button>
         {:else if inlineMode === 'camera'}
           <button class="action-btn" on:click={resetInlineArea}>Cancel Capture</button>
-        {:else if inlineMode === 'upload'}
-          <button class="action-btn action-primary" on:click={useUploadedPhotos} disabled={uploadThumbs.length === 0}>
-            Build Strip From Uploads
+        {:else if inlineMode === 'review'}
+          <div class="reorder-panel">
+            <p class="reorder-title">Reorder Shots</p>
+            <div class="reorder-track">
+              {#each uploadThumbs as thumb, index}
+                <div class="reorder-item">
+                  <img src={thumb} alt="thumbnail {index + 1}" class="tiny-thumb" />
+                  <span class="reorder-num">{index + 1}</span>
+                  <div class="reorder-actions">
+                    <button class="reorder-btn" disabled={index === 0} on:click={() => swapPhotos(index, index - 1)} aria-label="Move Before">
+                      <i class="ph-bold ph-caret-left"></i>
+                    </button>
+                    <button class="reorder-btn" disabled={index === uploadThumbs.length - 1} on:click={() => swapPhotos(index, index + 1)} aria-label="Move After">
+                      <i class="ph-bold ph-caret-right"></i>
+                    </button>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </div>
+          <button class="action-btn action-primary" on:click={proceedToProcessing} disabled={uploadThumbs.length === 0}>
+            Print Strip
           </button>
-          <button class="action-btn" on:click={triggerUpload}>Pick Different Files</button>
-          <button class="action-btn" on:click={resetInlineArea}>Cancel Upload</button>
+          <button class="action-btn" on:click={triggerUpload}>Upload Different</button>
+          <button class="action-btn" on:click={resetInlineArea}>Discard</button>
         {/if}
       </div>
     </section>
@@ -407,8 +444,8 @@
             {/if}
           </div>
 
-          {#if inlineMode === 'upload' && uploadThumbs.length === 0}
-            <p class="upload-hint">Choose up to 4 images to update preview.</p>
+          {#if inlineMode === 'review' && uploadThumbs.length === 0}
+            <p class="upload-hint">Take photos or choose 4 images.</p>
           {/if}
         {/if}
       </div>
@@ -735,6 +772,37 @@
     color: color-mix(in oklch, var(--teal-deep) 78%, var(--ink));
   }
 
+  .bottom-label-input {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .bottom-label-input label {
+    font-family: var(--font-ui);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.7rem;
+    color: color-mix(in oklch, var(--ink-soft) 72%, var(--ink));
+  }
+
+  .bottom-label-input input {
+    font-family: var(--font-ui);
+    font-size: 0.9rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid color-mix(in oklch, var(--ink) 20%, var(--paper));
+    border-radius: 3px;
+    background: color-mix(in oklch, var(--paper) 95%, var(--ink));
+    color: var(--ink);
+  }
+
+  .bottom-label-input input:focus {
+    outline: none;
+    border-color: var(--teal);
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--teal) 30%, transparent);
+  }
+
   .meta-row {
     margin-top: 0.72rem;
     display: flex;
@@ -786,6 +854,84 @@
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
+  }
+
+  .reorder-panel {
+    background: color-mix(in oklch, var(--paper) 95%, var(--ink));
+    border: 1px dashed color-mix(in oklch, var(--ink) 24%, var(--paper));
+    border-radius: 4px;
+    padding: 0.6rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .reorder-title {
+    font-family: var(--font-ui);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.65rem;
+    color: var(--ink-soft);
+  }
+
+  .reorder-track {
+    display: flex;
+    gap: 0.3rem;
+    justify-content: space-between;
+  }
+
+  .reorder-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    background: color-mix(in oklch, var(--paper-soft) 80%, var(--teal) 20%);
+    border: 1px solid color-mix(in oklch, var(--ink) 15%, var(--paper));
+    border-radius: 3px;
+    padding: 0.3rem;
+    flex: 1;
+  }
+
+  .tiny-thumb {
+    width: 100%;
+    aspect-ratio: 3/4;
+    object-fit: cover;
+    border-radius: 2px;
+    border: 1px solid color-mix(in oklch, var(--ink) 30%, transparent);
+    background: var(--ink);
+  }
+
+  .reorder-num {
+    font-family: var(--font-ui);
+    font-weight: 700;
+    font-size: 0.65rem;
+    color: var(--teal-deep);
+  }
+
+  .reorder-actions {
+    display: flex;
+    gap: 0.2rem;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .reorder-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid color-mix(in oklch, var(--ink) 18%, var(--paper));
+    border-radius: 2px;
+    background: color-mix(in oklch, var(--paper) 80%, var(--sun) 20%);
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  .reorder-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
   }
 
   .action-primary {

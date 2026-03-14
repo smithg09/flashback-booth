@@ -1,6 +1,6 @@
 <script>
   import { onDestroy, onMount } from 'svelte';
-  import { currentPage, currentResultId, photos, finalStrip, selectedFilter, selectedFrame, customEmoji, customColor } from './store.js';
+  import { currentPage, currentResultId, photos, finalStrip, selectedFilter, selectedFrame, customEmoji, customColor, customText } from './store.js';
   import { saveStrip } from './strip-db.js';
   import { generateStripDataUrl } from './strip-renderer.js';
 
@@ -50,7 +50,8 @@
         selectedFilter: $selectedFilter,
         selectedFrame: $selectedFrame,
         customEmoji: $customEmoji,
-        customColor: $customColor
+        customColor: $customColor,
+        footerLabel: $customText
       });
 
       if (!stripUrl) {
@@ -102,31 +103,33 @@
       </h2>
 
       <div class="progress-steps" aria-hidden="true">
-        <div class="step" class:active={progress >= 25}>
+        <div class="step" class:active={progress >= 5}>
           <div class="step-num">01</div>
           <div class="step-name">Chemical Bath</div>
           <div class="step-bar"></div>
         </div>
-        <div class="step" class:active={progress >= 50}>
+        <div class="step" class:active={progress >= 35}>
           <div class="step-num">02</div>
           <div class="step-name">Exposure</div>
           <div class="step-bar"></div>
         </div>
-        <div class="step" class:active={progress >= 75}>
+        <div class="step" class:active={progress >= 50}>
           <div class="step-num">03</div>
           <div class="step-name">Fixing</div>
           <div class="step-bar"></div>
         </div>
-        <div class="step" class:active={progress >= 100}>
+        <div class="step" class:active={progress >= 70}>
           <div class="step-num">04</div>
           <div class="step-name">Dispense</div>
           <div class="step-bar"></div>
         </div>
       </div>
 
-      <div class="output-log" aria-live="polite">
-        <span class="log-cursor">&gt;</span> {loadingMessage}
-      </div>
+      {#if progress >= 75}
+        <div class="output-log" aria-live="polite">
+          <span class="log-cursor">&gt;</span> {loadingMessage}
+        </div>
+      {/if}
     </div>
 
     <div class="machine-section" aria-hidden="true">
