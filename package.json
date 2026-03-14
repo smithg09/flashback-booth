@@ -1,0 +1,33 @@
+{
+  "name": "flashback-booth",
+  "version": "0.1.0",
+  "description": "A retro-style photobooth app built with Svelte and Vite.",
+  "type": "module",
+  "author": "",
+  "license": "MIT",
+  "keywords": [
+    "photobooth",
+    "svelte",
+    "vite",
+    "retro",
+    "webrtc",
+    "canvas"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/flashback-booth.git"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6.2.1",
+    "gh-pages": "^6.3.0",
+    "svelte": "^5.45.2",
+    "vite": "^7.3.1"
+  }
+}
